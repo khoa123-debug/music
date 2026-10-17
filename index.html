@@ -6751,7 +6751,7 @@ html.tiny-pc-beauty-v12 #uiverse-starfield #stars3 {
     <canvas id="laCanvas"></canvas>
 
     <!-- Âm thanh nhúng sẵn, không cần thư mục đi kèm. -->
-    <audio id="tiny-soundtrack" preload="auto" autoplay playsinline src="Chăm_Hoa.mp3"></audio>
+    <audio id="tiny-soundtrack" preload="auto" playsinline src="Chăm_Hoa.mp3"></audio>
     <div id="music-wait-hint" aria-live="polite">đợi chút xíu đii</div>
     <div id="tiny-lyric-zone" aria-live="off" aria-hidden="true">
       <div class="lyric-line" id="tiny-lyric-top"></div>
@@ -6771,7 +6771,7 @@ html.tiny-pc-beauty-v12 #uiverse-starfield #stars3 {
     <div id="text-11" class="text-layer">nè cầm lấy đi</div>
     <div id="text-12" class="text-layer">chúc cậu gặp được thật nhiều điều <span class="luck-green-words">may mắn</span>
         <br>
-    <span> Hết rùi!!</span>
+    <span>...Hết rùi!!</span>
     </div>
 
     <div id="lower-stars" aria-hidden="true"></div>
@@ -7183,89 +7183,50 @@ html.tiny-pc-beauty-v12 #uiverse-starfield #stars3 {
         
         // === MP3 + lyric: đồng hồ nhạc là nguồn thời gian duy nhất, không lệ thuộc số lượt click. ===
         const tinySoundtrack = document.getElementById('tiny-soundtrack');
-        const musicWaitHint = document.getElementById('music-wait-hint');
         const lyricZone = document.getElementById('tiny-lyric-zone');
         const lyricSlots = [document.getElementById('tiny-lyric-top'), document.getElementById('tiny-lyric-bottom')];
-
-        const lyricCues = [{"time":0.0,"text":"chỉ biết nói cho em"},{"time":1.7,"text":"nghe vậy thôi"},{"time":3.4,"text":"vì đã lỡ yêu em rồi"},{"time":6.3,"text":"chẳng giám hứa xa sôi"},{"time":9.7,"text":"người ta nói chẳng ai hiểu"},{"time":13.1,"text":"về hai tiếng thương yêu"},{"time":16.0,"text":"chẳng phải cứ bên nhau"},{"time":18.1,"text":"làm nhau khổ đau là tình yêu?"},{"time":22.8,"text":"nhiều khi rất yêu nhau mà"},{"time":26.0,"text":"phải đứng ở rất xa"},{"time":29.4,"text":"nhìn em hạnh phúc bên ai chẳng phải mình"},{"time":33.4,"text":"vì mình có làm được đâu"},{"time":35.7,"text":"nhường ai khác bên em là"},{"time":38.5,"text":"nhường đi hết tất cả"},{"time":42.0,"text":"yêu em chẳng khiến em được vui"},{"time":44.9,"text":"thế nên anh phải xa"},{"time":48.7,"text":"càng yêu chỉ thêm thất vọng"},{"time":51.8,"text":"càng tan nát cõi lòng"},{"time":55.0,"text":"không được như mong"}];
-        const MUSIC_HOLD_TIME = 9.7;
-        const MUSIC_FADE_START = 8.35;
+        const lyricCues = [
+            {"time":40.5,"text":"Tiếng sét của ái tình muốn gắn kết duyên nợ đôi mình"},
+            {"time":46.2,"text":"Gieo mầm thương ở nơi tâm hồn để hóa một rừng hoa"},
+            {"time":51.4,"text":"Khu vườn từ lâu chẳng có một ai ghé ngang qua"},
+            {"time":56.0,"text":"Phải chăng đã yêu rồi từ ngay ánh mắt đầu tiên? Ooh"}
+        ];
         const MUSIC_VOLUME = 0.84;
-        let musicGateClosed = false;
-        let musicAllowedPastGate = false;
-        let musicFadeTimer = null;
-        let musicResumeFadeStart = 0;
-        let musicSeekingResume = false;
+        const MUSIC_FADE_DURATION = 5000;
+        let musicFadeStarted = false;
         let lyricActiveIndex = -1;
         let lyricSlotIndex = -1;
         let lyricInterval = null;
-        tinySoundtrack.volume = MUSIC_VOLUME;
+        tinySoundtrack.volume = 0;
         tinySoundtrack.muted = false;
-        let musicHintTimer = null;
-        const musicWaitMessages = ['đợi chút xíu đii', 'đợi chút nữa thui', 'xíu nữa', 'sắp được rùi', '1 chút thuii'];
-        function showMusicWaitHint() {
-            const msg = musicWaitMessages[Math.floor(Math.random() * musicWaitMessages.length)];
-            musicWaitHint.textContent = msg;
-            musicWaitHint.classList.add('show');
-            clearTimeout(musicHintTimer);
-            musicHintTimer = setTimeout(() => musicWaitHint.classList.remove('show'), 1700);
+
+        function fadeInMusic() {
+            if (musicFadeStarted) return;
+            musicFadeStarted = true;
+            const fadeStart = performance.now();
+            const step = (now) => {
+                if (tinySoundtrack.paused) {
+                    musicFadeStarted = false;
+                    return;
+                }
+                const progress = Math.min(1, (now - fadeStart) / MUSIC_FADE_DURATION);
+                tinySoundtrack.volume = MUSIC_VOLUME * progress;
+                if (progress < 1) requestAnimationFrame(step);
+            };
+            requestAnimationFrame(step);
         }
 
         function startMusicIfAllowed() {
-            // Trình duyệt có thể chặn autoplay có tiếng khi chưa có thao tác người dùng.
-            // Không hiện nút: thử phát khi mở, và thử lại trong lần click/chạm đầu tiên.
-            if (musicGateClosed && !musicAllowedPastGate) return;
-            if (!tinySoundtrack.paused) return;
-            const p = tinySoundtrack.play();
-            if (p && typeof p.catch === 'function') p.catch(() => {});
-        }
-
-        function musicFadeAndHold() {
-            if (musicAllowedPastGate || musicGateClosed) return;
-            const t = tinySoundtrack.currentTime || 0;
-            if (t >= MUSIC_HOLD_TIME - .02) {
-                musicGateClosed = true;
-                scheduleIntroNudge(2000);
-                tinySoundtrack.pause();
-                try { tinySoundtrack.currentTime = MUSIC_HOLD_TIME; } catch (_) {}
-                tinySoundtrack.volume = 0;
-                if (musicFadeTimer !== null) { clearInterval(musicFadeTimer); musicFadeTimer = null; }
+            if (tinySoundtrack.ended) return;
+            if (!tinySoundtrack.paused) {
+                if (tinySoundtrack.readyState >= 3) fadeInMusic();
                 return;
             }
-            if (t >= MUSIC_FADE_START) {
-                tinySoundtrack.volume = MUSIC_VOLUME * Math.max(0, (MUSIC_HOLD_TIME - t) / (MUSIC_HOLD_TIME - MUSIC_FADE_START));
+            // Chrome may reject audible autoplay unless this site has permission.
+            const playRequest = tinySoundtrack.play();
+            if (playRequest && typeof playRequest.then === 'function') {
+                playRequest.then(fadeInMusic).catch(() => {});
             }
-        }
-
-        // Chỉ phát tiếp sau khi nghe đủ 9,7 giây VÀ click vào "ui cậu đẹp quá".
-        function resumeMusicAtBeauty() {
-            if (musicAllowedPastGate) return;
-            if (!musicGateClosed || tinySoundtrack.currentTime < MUSIC_HOLD_TIME - .045) return;
-            musicAllowedPastGate = true;
-            musicGateClosed = false;
-            if (musicFadeTimer !== null) { clearInterval(musicFadeTimer); musicFadeTimer = null; }
-            musicSeekingResume = true;
-            if (tinySoundtrack.readyState >= 1) {
-                try { tinySoundtrack.currentTime = Math.max(MUSIC_HOLD_TIME, tinySoundtrack.currentTime); } catch (_) {}
-            } else {
-                tinySoundtrack.addEventListener('loadedmetadata', () => {
-                    if (musicSeekingResume) tinySoundtrack.currentTime = MUSIC_HOLD_TIME;
-                }, {once:true});
-            }
-            tinySoundtrack.volume = 0;
-            const fadeIn = (now) => {
-                if (tinySoundtrack.paused || !musicAllowedPastGate) return;
-                const v = Math.min(1, (now - musicResumeFadeStart) / 850);
-                tinySoundtrack.volume = MUSIC_VOLUME * v;
-                if (v < 1) requestAnimationFrame(fadeIn);
-            };
-            // Đợi âm thanh PHÁT THỰC SỰ rồi mới đếm 850ms tăng âm lượng.
-            // Nếu bắt đầu rAF trước play() xong thì có thể bị kẹt tại volume=0.
-            tinySoundtrack.addEventListener('playing', () => {
-                musicResumeFadeStart = performance.now();
-                requestAnimationFrame(fadeIn);
-            }, {once:true});
-            startMusicIfAllowed();
         }
 
         function cueIndexAt(t) {
@@ -7316,16 +7277,10 @@ html.tiny-pc-beauty-v12 #uiverse-starfield #stars3 {
         }
 
         tinySoundtrack.addEventListener('timeupdate', () => {
-            musicFadeAndHold();
             if (activeWish === 'smile') syncLyricWithMusic();
         });
-        tinySoundtrack.addEventListener('play', () => {
-            if (!musicAllowedPastGate && !musicGateClosed && musicFadeTimer === null)
-                musicFadeTimer = setInterval(musicFadeAndHold, 35);
-        });
-        // Thử phát NGAY khi mở trang (và khi media sẵn sàng), không cần nút riêng.
-        // Chrome/Safari có thể chặn tiếng khi chưa có tương tác: trường hợp đó click đầu tiên
-        // trên trang sẽ khởi phát nhạc như trước, không thể vượt qua chính sách bằng JavaScript.
+        tinySoundtrack.addEventListener('playing', fadeInMusic);
+        // Begin immediately. Chrome may start the track muted, then fade it in.
         startMusicIfAllowed();
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', startMusicIfAllowed, {once:true});
@@ -7334,9 +7289,6 @@ html.tiny-pc-beauty-v12 #uiverse-starfield #stars3 {
         window.addEventListener('pageshow', startMusicIfAllowed);
         tinySoundtrack.addEventListener('canplay', startMusicIfAllowed, {once:true});
         tinySoundtrack.addEventListener('canplaythrough', startMusicIfAllowed, {once:true});
-        // Khi người dùng đã cho phép tự phát âm thanh trên website, nhạc bắt đầu
-        // ngay khi trang/media sẵn sàng. Nếu trình duyệt chặn autoplay có tiếng,
-        // tương tác đầu tiên sẽ mở khóa (không có cách JS hợp lệ để vượt chính sách đó).
         document.addEventListener('pointerdown', startMusicIfAllowed, {passive:true});
         document.addEventListener('keydown', startMusicIfAllowed);
         document.addEventListener('visibilitychange', () => {
@@ -7345,8 +7297,6 @@ html.tiny-pc-beauty-v12 #uiverse-starfield #stars3 {
 
         let clickCount = 0;
         let animationStarted = false;
-        // Gợi ý xuất hiện khi nhạc đầu đã nghe đủ 9,7 giây, người xem chờ thêm 2s
-        // ở một trong ba cảnh mở đầu, kể cả cảnh nhận lệnh từ Dr D. Không dựa trên thời gian mở trang.
         const introNudge = document.getElementById('tiny-intro-nudge');
         let introNudgeTimer = null;
         function hideIntroNudge() {
@@ -7355,22 +7305,7 @@ html.tiny-pc-beauty-v12 #uiverse-starfield #stars3 {
             introNudge?.classList.remove('show');
             khungMat.classList.remove('tiny-intro-urging');
         }
-        function scheduleIntroNudge(waitMs=2000) {
-            clearTimeout(introNudgeTimer);
-            if (!musicGateClosed || musicAllowedPastGate || clickCount > 2) return;
-            introNudgeTimer = setTimeout(() => {
-                if (!musicGateClosed || musicAllowedPastGate || clickCount > 2 || document.hidden) return;
-                // Nếu người xem chưa đánh thức Tiny, Tiny tự mở mắt mời sang cảnh.
-                matElements.forEach(eye => eye.classList.add('thuc'));
-                khungMat.classList.add('tiny-intro-urging');
-                introNudge?.classList.add('show');
-            },waitMs);
-        }
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) hideIntroNudge();
-            else if (musicGateClosed && !musicAllowedPastGate && clickCount <= 2)
-                scheduleIntroNudge(2000);
-        });
+
 
         let canClick = true;
         let dungRoiHoa = false;
@@ -7404,12 +7339,6 @@ html.tiny-pc-beauty-v12 #uiverse-starfield #stars3 {
                 if (!canClick) return;
                 // Gọi play() ngay trong tương tác để Chrome cho phép âm thanh.
                 startMusicIfAllowed();
-                // Không được bỏ qua 9,7 giây đầu dù click nhiều lần.
-                if (clickCount === 2 && (!musicGateClosed || tinySoundtrack.currentTime < MUSIC_HOLD_TIME - .045)) {
-                    showMusicWaitHint();
-                    return;
-                }
-                if (clickCount === 2) resumeMusicAtBeauty();
                 hideIntroNudge();
 
                 if (clickCount === 0) {
@@ -7422,7 +7351,6 @@ html.tiny-pc-beauty-v12 #uiverse-starfield #stars3 {
                         text2.classList.add('hien-thi'); 
                         setTimeout(kichHoatChuKyChop, 1000);
                         canClick = true;
-                        if (musicGateClosed && clickCount === 1) scheduleIntroNudge(2000); 
                     }, 700);
                 } 
                 else if (clickCount === 1) {
@@ -7430,7 +7358,6 @@ html.tiny-pc-beauty-v12 #uiverse-starfield #stars3 {
                     text2.classList.remove('hien-thi');
                     text3.classList.add('hien-thi');
                     batDauLiec();
-                    if (musicGateClosed && !musicAllowedPastGate) scheduleIntroNudge(2000);
                 }
                 else if (clickCount === 2) {
                     clickCount++;
